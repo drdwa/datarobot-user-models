@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### [1.4.4] - in progress
 ##### Added
 - New `transform` target type for performing pre-/post- processing on features/targets
+- **/predictions** and **/predictionsUnstructured** endpoints as aliases for **/predict** and **/predictUnstructured**
+- handling the case when input sent as binary data
 
 #### [1.4.3] - 2020-11-17
 ##### Added
