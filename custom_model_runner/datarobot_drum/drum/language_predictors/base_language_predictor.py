@@ -77,6 +77,6 @@ class BaseLanguagePredictor(ABC):
             )
 
     @abstractmethod
-    def predict(self, input_filename):
+    def predict(self, **kwargs):
         """ Predict on input_filename """
         pass

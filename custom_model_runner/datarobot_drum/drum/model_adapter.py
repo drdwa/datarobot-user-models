@@ -5,6 +5,7 @@ import pickle
 import sys
 import textwrap
 import pyarrow
+import io
 from pathlib import Path
 
 import numpy as np
@@ -282,7 +283,7 @@ class PythonModelAdapter:
             )
 
     @staticmethod
-    def _read_structured_input(filename):
+    def _read_structured_input_file(filename):
         try:
             if filename.endswith(".mtx"):
                 return pd.DataFrame.sparse.from_spmatrix(mmread(filename))
@@ -293,6 +294,16 @@ class PythonModelAdapter:
         except pd.errors.ParserError as e:
             raise DrumCommonException("Pandas failed to read input csv file: {}".format(filename))
 
+    @staticmethod
+    def _read_structured_input_data(binary_data, format=None):
+        text_data = binary_data.decode("utf-8")
+        try:
+            return pd.read_csv(io.StringIO(text_data))
+        except pd.errors.ParserError as e:
+            raise DrumCommonException(
+                "Pandas failed to read input binary data {}".format(text_data)
+            )
+
     @property
     def supported_payload_formats(self):
         formats = SupportedPayloadFormats()
@@ -300,23 +311,25 @@ class PythonModelAdapter:
         formats.add(PayloadFormat.ARROW, pyarrow.__version__)
         return formats
 
-    def transform(self, input_filename, model):
+    def transform(self, model=None, **kwargs):
         """
         Load data, either with read hook or built-in method, and apply transform hook if present
 
         Parameters
         ----------
-        input_filename: str
-            Path to the feature csv
         model: Any
             The model
         Returns
         -------
         pd.DataFrame
         """
+        input_filename = kwargs.get("filename")
+        input_data = kwargs.get("binary_data")
         if self._custom_hooks.get(CustomHooks.READ_INPUT_DATA):
             try:
-                data = self._custom_hooks[CustomHooks.READ_INPUT_DATA](input_filename)
+                data = self._custom_hooks[CustomHooks.READ_INPUT_DATA](
+                    input_filename if input_filename is not None else input_data
+                )
             except Exception as exc:
                 raise type(exc)(
                     "Model read_data hook failed to read input file: {} {}".format(
@@ -324,7 +337,10 @@ class PythonModelAdapter:
                     )
                 ).with_traceback(sys.exc_info()[2]) from None
         else:
-            data = PythonModelAdapter._read_structured_input(input_filename)
+            if input_filename is not None:
+                data = PythonModelAdapter._read_structured_input_file(input_filename)
+            else:
+                data = PythonModelAdapter._read_structured_input_data(input_data)
 
         if self._custom_hooks.get(CustomHooks.TRANSFORM):
             try:
@@ -343,7 +359,7 @@ class PythonModelAdapter:
 
         return output_data
 
-    def predict(self, input_filename, model=None, **kwargs):
+    def predict(self, model=None, **kwargs):
         """
         Makes predictions against the model using the custom predict
         method and returns a pandas DataFrame
@@ -353,8 +369,6 @@ class PythonModelAdapter:
             positive_class_label/negative_class_label keywords.
         Parameters
         ----------
-        data: pd.DataFrame
-            Data to make predictions against
         model: Any
             The model
         kwargs
@@ -362,7 +376,7 @@ class PythonModelAdapter:
         -------
         pd.DataFrame
         """
-        data = self.transform(input_filename, model)
+        data = self.transform(model, **kwargs)
 
         positive_class_label = kwargs.get(POSITIVE_CLASS_LABEL_ARG_KEYWORD)
         negative_class_label = kwargs.get(NEGATIVE_CLASS_LABEL_ARG_KEYWORD)

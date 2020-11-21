@@ -144,7 +144,8 @@ class JavaPredictor(BaseLanguagePredictor):
         formats.add(PayloadFormat.CSV)
         return formats
 
-    def predict(self, input_filename):
+    def predict(self, **kwargs):
+        input_filename = kwargs.get("filename")
         out_csv = self._predictor_via_py4j.predict(input_filename)
         out_df = pd.read_csv(StringIO(out_csv))
         return out_df

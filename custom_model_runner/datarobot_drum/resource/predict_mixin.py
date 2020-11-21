@@ -35,25 +35,29 @@ class PredictMixin:
         file_key = "X"
         filestorage = request.files.get(file_key)
 
-        if not filestorage:
+        if filestorage is not None:
+            _, file_ext = os.path.splitext(filestorage.filename)
+            with tempfile.NamedTemporaryFile(suffix=file_ext) as f:
+                filestorage.save(f)
+                f.flush()
+                out_data = self._predictor.predict(filename=f.name)
+
+            if logger is not None:
+                logger.debug("Filename provided under X key: {}".format(filestorage.filename))
+
+        # TODO: probably need to return empty response in case of empty request
+        elif len(request.data):
+            out_data = self._predictor.predict(binary_data=request.data)
+        else:
             wrong_key_error_message = (
-                "Samples should be provided as a csv, mtx, or arrow file under `{}` key.".format(
-                    file_key
-                )
+                "Samples should be provided as: "
+                "  - a csv, mtx, or arrow file under `{}` form-data param key."
+                "  - binary data".format(file_key)
             )
             if logger is not None:
                 logger.error(wrong_key_error_message)
             response_status = HTTP_422_UNPROCESSABLE_ENTITY
             return {"message": "ERROR: " + wrong_key_error_message}, response_status
-        else:
-            if logger is not None:
-                logger.debug("Filename provided under X key: {}".format(filestorage.filename))
-
-        _, file_ext = os.path.splitext(filestorage.filename)
-        with tempfile.NamedTemporaryFile(suffix=file_ext) as f:
-            filestorage.save(f)
-            f.flush()
-            out_data = self._predictor.predict(f.name)
 
         if self._target_type == TargetType.UNSTRUCTURED:
             response = out_data
