@@ -146,7 +146,10 @@ class JavaPredictor(BaseLanguagePredictor):
 
     def predict(self, **kwargs):
         input_filename = kwargs.get("filename")
-        out_csv = self._predictor_via_py4j.predict(input_filename)
+        input_binary_data = kwargs.get("binary_data")
+        if input_binary_data is not None:
+            input_binary_data = input_binary_data.decode("utf-8")
+        out_csv = self._predictor_via_py4j.predict(input_filename, input_binary_data)
         out_df = pd.read_csv(StringIO(out_csv))
         return out_df
 
